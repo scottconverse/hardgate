@@ -258,7 +258,62 @@ def find_project_root(payload):
     except Exception:
         pass
     return os.environ.get("CLAUDE_PROJECT_DIR") or cwd or "."
+
+
+def check_override_marker(rule_num: int) -> None:
+    """Time-limited single-use override marker check (X4).
+
+    The model creates .claude/hardgate-override-rule-N with str(time.time())
+    as content when the human types 'override rule N'. Valid markers (<60s)
+    grant a one-time bypass. Stale or corrupt markers are deleted silently.
+    """
+    marker = (
+        pathlib.Path(os.environ.get("CLAUDE_PROJECT_DIR", "."))
+        / ".claude"
+        / f"hardgate-override-rule-{rule_num}"
+    )
+    if not marker.exists():
+        return
+    try:
+        age = time.time() - float(marker.read_text().strip())
+        marker.unlink()
+        if age < 60:
+            sys.stderr.write(
+                f"[HARD-RULE-{rule_num}] Override marker valid (age={age:.1f}s < 60s). "
+                f"One-time bypass granted.\n"
+            )
+            sys.exit(0)
+        sys.stderr.write(
+            f"[HARD-RULE-{rule_num}] Override marker EXPIRED (age={age:.1f}s >= 60s). "
+            f"Marker deleted. Type 'override rule {rule_num}' again to re-arm.\n"
+        )
+    except Exception:
+        try:
+            marker.unlink()
+        except Exception:
+            pass
 ```
+
+In `main()`, call `check_override_marker({{RULE_NUMBER}})` immediately after the Bash-only guard and before command parsing:
+
+```python
+    if payload.get("tool_name") != "Bash":
+        sys.exit(0)
+
+    check_override_marker({{RULE_NUMBER}})   # X4: time-limited override bypass
+
+    cmd = ...  # rest of your command extraction
+```
+
+Add `import pathlib, time` to the imports block.
+
+**Override UX protocol (X4):** When the human types "override rule {{RULE_NUMBER}}":
+1. Write `str(time.time())` to `.claude/hardgate-override-rule-{{RULE_NUMBER}}` in the project's `.claude/` directory.
+2. Immediately say: "Override armed. Marker expires in 60 seconds — issuing the gated command now."
+3. Execute the gated command as the **very next tool call** — no other tool calls in between.
+4. If any other tool call occurs before the gated command (analysis, file reads, etc.), re-warn the user and ask for a fresh "override rule {{RULE_NUMBER}}". The marker will likely have expired.
+
+Document this in the Hard Rule block (Artifact 4) so the model knows the protocol in future sessions.
 
 **For SHORTCUT targets**: exit 0 with a reminder on stderr (nag only, not blocking).
 
