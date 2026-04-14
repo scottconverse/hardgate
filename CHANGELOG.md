@@ -31,9 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **(U2, #10)** Step 7 now appends the full completion report to `.claude/hardgate-install-log.md` with an ISO 8601 UTC timestamp (creates the file on first install). Gives a persistent audit trail that survives session compaction and restarts.
 - **(U6, #20)** `/disable-gate` now shows (a) which JSON hook keys reference the target in `.claude/settings.json` and (b) the exact Hard Rule block text from `~/.claude/CLAUDE.md` before asking for confirmation. The user sees precisely what will be deleted before typing `yes`. Protected targets (`context-mode`, `coder-ui-qa-test`) require a second confirmation.
 
+### v1.1.0 Sprint 4 — X4 Override Marker File (isolated PR)
+
+- **(X4, #11)** Override mechanism replaced with a time-limited marker file. When the human types "override rule N", the model writes `str(time.time())` to `.claude/hardgate-override-rule-N`. Gate scripts check for the marker at startup: age < 60s → delete + exit 0 (one-time bypass); age >= 60s → delete + EXPIRED diagnostic + block normally; corrupt → delete silently + block. Marker is always single-use. SKILL.md Artifact 1 template updated with `check_override_marker({{RULE_NUMBER}})` helper and UX protocol. Both live gate scripts (`coder-ui-qa-test-gate.py`, `context-mode-gate.py`) patched. Both CLAUDE.md files (global + project) updated with the 4-step override protocol so the model knows to execute the gated command as its very next tool call. The 60-second window is intentional and cannot be relaxed.
+
 ### Build artifact
 
-- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 3 SKILL.md + disable-gate.md changes. New sha256: `d509b0cbb5484bd425189c51ca8425282f206735cfc6ed20b367aec1bbf562d6`. The CI drift check is updated automatically since the committed zip is the source of truth.
+- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 4 SKILL.md changes. New sha256: `5cbdb29e96a4d9c048f1a858a739b26d9f9b2130a8dcdc17eec9164807e9d599`. The CI drift check is updated automatically since the committed zip is the source of truth.
 
 ## [1.0.1] — 2026-04-14
 
