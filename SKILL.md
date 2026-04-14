@@ -400,7 +400,8 @@ Read the current `.claude/settings.json` (PROJECT-LEVEL). Add the PreToolUse hoo
         "matcher": "Bash",
         "hooks": [{
           "type": "command",
-          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/<target>-gate.sh"
+          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/<target>-gate.sh",
+          "if": "<JS regex — see below>"
         }]
       }
     ]
@@ -409,6 +410,20 @@ Read the current `.claude/settings.json` (PROJECT-LEVEL). Add the PreToolUse hoo
 ```
 
 **(B7)** Quote the variable alone, not the whole path. Both forms are functionally equivalent in POSIX shells, but variable-only quoting matches Anthropic's documented hook examples and is the convention to follow.
+
+**(D1) `if` field — pre-filter hook launches:** The `if` value is a JavaScript expression evaluated against the tool payload. When it is falsy, the hook script is never launched — avoids a Python process spawn for every `git add`, `mkdir`, etc. Build the regex from the FORBIDDEN or GATED list:
+
+**For PLUGIN targets** (e.g., context-mode — blocks forbidden read verbs):
+```json
+"if": "tool_input.command && /\\bcat\\b|\\bhead\\b|\\btail\\b|\\bgrep\\b|\\brg\\b|\\bfind\\b|git\\s+(log|diff|show|blame)|\\bpytest\\b|\\bjest\\b|npm\\s+test|docker.*(logs|compose)|\\bjournalctl\\b|\\bdmesg\\b|\\bls\\b.*-[la]/.test(tool_input.command)"
+```
+
+**For SKILL targets** (e.g., coder-ui-qa-test — blocks push/release until deliverables exist):
+```json
+"if": "tool_input.command && /git\\s+push|gh\\s+release\\s+create|npm\\s+publish|python3?\\s+-m\\s+build/.test(tool_input.command)"
+```
+
+The regex should be a union of every verb pattern the Python gate checks. When in doubt, be permissive — a false negative (gate runs unnecessarily) is safe; a false positive (gate silently skipped for a forbidden command) is a security hole.
 
 For SKILL targets, also add a Stop hook (same B7 quoting style):
 ```json
