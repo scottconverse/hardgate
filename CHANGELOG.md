@@ -17,8 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   3. installer drift check — rebuilds `hardgate-v1.0.0.zip` from source in a tmpdir and fails if the sha256 does not match the committed `dist/hardgate-v1.0.0.zip`.
 
 ### Changed
-- `dist/hardgate-v1.0.0.zip` rebuilt via `scripts/build-installer.py` for reproducibility. The Release asset on GitHub was re-uploaded to match. The installed-file contents are byte-identical to the original; only the zip container metadata (file order, create_system, mtimes) changed. New sha256: `9f4f521d7db0d47d10d3a35503e8f3dd8bd1be05b09ee184f2238e82c2d497fc`.
+- `dist/hardgate-v1.0.0.zip` rebuilt via `scripts/build-installer.py` for reproducibility. The Release asset on GitHub was re-uploaded to match. The installed-file contents are byte-identical to the original; only the zip container metadata (file order, create_system, mtimes) changed. After the install.ps1 fixes below the zip was rebuilt a second time; current sha256: `0a2c8e4760d6349b1bb56a09f20937f6dfe8526f91cf4f3721361aed62ce3074`.
 - README/USER-MANUAL multi-format outputs regenerated through `scripts/build-docs.py`. The ad-hoc initial build used a `©` glyph in the copyright line; the reproducible build uses ASCII `(c)` to avoid encoding surprises in PDFs.
+- `.gitattributes` added to force LF line endings in the working tree on every platform. Without this, Windows GitHub runners (which ship with `core.autocrlf=true`) checked out `.md` files as CRLF, causing the installer test harness to fail when comparing source files (CRLF on the runner) against the LF contents of the installer zip.
+
+### Fixed
+- **`install.ps1` did not honor an isolated test home.** The PowerShell test harness tried to override `$HOME` via `pwsh -Command "$HOME = ..."` in a child process, but PowerShell's automatic `$HOME` is initialized at host startup and the override did not propagate to the script's scope. As a result, `install.ps1` happily wrote files to the real user profile during CI runs and the test then found nothing in the fake home. Fix: added a `-TargetHome` parameter to `install.ps1` (defaults to `$HOME`); the test harness now passes `-TargetHome <fake-home>` explicitly. Production users still call the script with no arguments.
+- **`install.ps1` returned the wrong exit code on the missing-sources path.** With `$ErrorActionPreference = 'Stop'`, the `Write-Error` call thrown for missing source files terminated the script before the subsequent `exit 2` could run, so the harness was hitting the wrong exit code. Fix: write the error message to `[Console]::Error` directly, then `exit 2`. The refuse-when-sources-missing test now passes on Windows.
+- **Windows CI sha256 mismatch.** Even after the two fixes above, the runner's source-vs-installed sha256 comparison still failed because `actions/checkout@v4` on `windows-latest` was applying `core.autocrlf=true` to the `.md` files, while the installer zip carried LF. Fix: committed `.gitattributes` to pin all text files to LF on every platform.
 
 ## [1.0.0] — 2026-04-14
 
