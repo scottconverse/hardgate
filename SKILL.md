@@ -149,6 +149,15 @@ cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak-$TIMESTAMP 2>/dev/null || true
 
 If a project CLAUDE.md exists, back that up too.
 
+After creating backups, prune old ones — keep the 3 most recent per base file:
+
+```bash
+for base in ".claude/settings.json" "$HOME/.claude/settings.json" "$HOME/.claude/CLAUDE.md" "./CLAUDE.md"; do
+  mapfile -t old < <(ls -t "${base}.bak-"* 2>/dev/null | tail -n +4)
+  [ ${#old[@]} -gt 0 ] && rm -f "${old[@]}"
+done
+```
+
 ---
 
 ### Step 4: Write all 7 artifacts
@@ -257,12 +266,14 @@ After writing both files: `chmod +x .claude/hooks/<target>-gate.sh`
 
 **Unit test immediately after writing** (assert exit code, do not just echo it):
 ```bash
-RESULT=$(python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"<FORBIDDEN_COMMAND>"}}' 2>&1)
-EXIT=$?
-[ "$EXIT" = "2" ] || { echo "GATE UNIT TEST FAILED (exit=$EXIT) — install cannot proceed"; echo "$RESULT"; exit 1; }
-echo "UNIT TEST PASSED: $RESULT"
+HG_TEST_OUTPUT=$(python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"<FORBIDDEN_COMMAND>"}}' 2>&1)
+HG_TEST_EXIT=$?
+[ "$HG_TEST_EXIT" = "2" ] || { echo "GATE UNIT TEST FAILED (exit=$HG_TEST_EXIT) — install cannot proceed"; echo "$HG_TEST_OUTPUT"; exit 1; }
+echo "UNIT TEST PASSED: $HG_TEST_OUTPUT"
 ```
 Must return EXIT: 2 with the HARD-RULE marker. If not, fix before proceeding.
+
+**Save for Step 7:** Note the exact content of `$HG_TEST_OUTPUT` and `$HG_TEST_EXIT`. Step 7 will write both verbatim to `.claude/hardgate-install-log.md` and display them in the completion report.
 
 ---
 
@@ -544,6 +555,43 @@ Behavioral tests:
 ACTIVATION: Restart Claude Code / Cowork to load the new hooks.
 To remove this gate later: /disable-gate {{TARGET}}
 ```
+
+Also append this report to `.claude/hardgate-install-log.md` (create if it doesn't exist):
+
+```python
+import datetime, pathlib
+
+log_path = pathlib.Path('.claude/hardgate-install-log.md')
+timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+# HG_TEST_EXIT and HG_TEST_OUTPUT captured from Artifact 1 unit test
+entry = f"""
+## [{timestamp}] HARD GATE INSTALLED: {{TARGET_NAME}}
+
+**Rule:** Hard Rule {{RULE_NUMBER}} — {{RULE_NAME}}
+**Type:** [plugin/skill/shortcut]
+
+### Artifacts written
+1. .claude/hooks/{{TARGET}}-gate.sh + .py
+2. .claude/settings.json (PreToolUse hook added)
+3. ~/.claude/settings.json (permissions updated)
+4. ~/.claude/CLAUDE.md (Hard Rule {{RULE_NUMBER}})
+5. <project>/CLAUDE.md (Hard Rule {{RULE_NUMBER}})
+6. .claude/hooks/{{TARGET}}-session-start.sh + .py
+7. ~/.claude/projects/.../memory/{{TARGET}}-gate.md
+
+### Unit test result (D4)
+Exit code: {HG_TEST_EXIT}
+Output:
+{HG_TEST_OUTPUT}
+"""
+
+with log_path.open('a', encoding='utf-8') as f:
+    f.write(entry)
+print(f"Install log updated: {log_path}")
+```
+
+Replace `{HG_TEST_EXIT}` and `{HG_TEST_OUTPUT}` with the actual values captured in Artifact 1. Display the unit test output verbatim in the completion report shown to the user.
 
 ---
 

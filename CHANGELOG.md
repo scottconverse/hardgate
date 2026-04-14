@@ -24,9 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **(D5, #18)** Rule number derivation is now explicit in Step 2. A Python snippet reads `~/.claude/CLAUDE.md`, collects all `Hard Rule N` headings via regex, and returns `max(N) + 1` (defaults to 1 if none exist). Step 5 now includes a collision guard that asserts exactly 1 occurrence of the new rule number was written — catches both missing-write and duplicate-write bugs.
 - **CI action versions bumped**: `actions/checkout@v4→v6`, `actions/setup-python@v5→v6` to silence Node.js 20 deprecation warnings surfaced in the Sprint 1 run audit.
 
+### v1.1.0 Sprint 3 — Install loop tightening (4 issues)
+
+- **(D3, #17)** Step 3 now prunes old backups after each new `.bak-TIMESTAMP` write. Uses `mapfile -t old < <(ls -t "${base}.bak-"* | tail -n +4)` to retain the 3 most recent backups per file and delete the rest. Covers `.claude/settings.json`, `~/.claude/settings.json`, `~/.claude/CLAUDE.md`, and the project CLAUDE.md if present.
+- **(D4, #9)** Artifact 1 unit-test output now captured into named variables `HG_TEST_OUTPUT` / `HG_TEST_EXIT`. A "Save for Step 7" prose instruction tells the model to carry the values forward. Step 7 writes both verbatim to `.claude/hardgate-install-log.md` and displays them in the completion report. Prevents the previous silent-pass scenario where a model could hallucinate a successful test.
+- **(U2, #10)** Step 7 now appends the full completion report to `.claude/hardgate-install-log.md` with an ISO 8601 UTC timestamp (creates the file on first install). Gives a persistent audit trail that survives session compaction and restarts.
+- **(U6, #20)** `/disable-gate` now shows (a) which JSON hook keys reference the target in `.claude/settings.json` and (b) the exact Hard Rule block text from `~/.claude/CLAUDE.md` before asking for confirmation. The user sees precisely what will be deleted before typing `yes`. Protected targets (`context-mode`, `coder-ui-qa-test`) require a second confirmation.
+
 ### Build artifact
 
-- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 2 SKILL.md changes. New sha256: `e29df67fd9db9cc110a4ada38815bd3f2336b93be718fff04b202313f52a0d1b`. The CI drift check is updated automatically since the committed zip is the source of truth.
+- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 3 SKILL.md + disable-gate.md changes. New sha256: `d509b0cbb5484bd425189c51ca8425282f206735cfc6ed20b367aec1bbf562d6`. The CI drift check is updated automatically since the committed zip is the source of truth.
 
 ## [1.0.1] — 2026-04-14
 
