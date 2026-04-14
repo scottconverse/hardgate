@@ -11,8 +11,8 @@ Ask which one to remove.
 ## Removal steps (execute in order):
 
 1. **Back up project settings.json**: `cp .claude/settings.json .claude/settings.json.bak-$(date +%Y%m%d-%H%M%S)`
-2. **Remove hook scripts**: Delete `.claude/hooks/<target>-gate.sh`, `.claude/hooks/<target>-gate.py`, `.claude/hooks/<target>-session-start.sh`, `.claude/hooks/<target>-session-start.py`, and `.claude/hooks/<target>-stop-check.sh` (if they exist)
-3. **Remove project settings.json hook entries**: Remove PreToolUse, PostToolUse, Stop, and SessionStart entries that reference the deleted scripts from `.claude/settings.json`. Use python3 for safe JSON editing. Do NOT remove the permissions block.
+2. **Remove hook scripts**: Delete `.claude/hooks/<target>-gate.sh`, `.claude/hooks/<target>-gate.py`, `.claude/hooks/<target>-session-start.sh`, `.claude/hooks/<target>-session-start.py`, `.claude/hooks/<target>-stop-check.sh`, and `.claude/hooks/<target>-stop-check.py` (if they exist — stop-check files only exist for skill targets)
+3. **Remove project settings.json hook entries**: Remove `PreToolUse`, `Stop`, and `SessionStart` entries that reference the deleted scripts from `.claude/settings.json`. Use python3 for safe JSON editing. Do NOT remove the permissions block. **(B6)** Earlier versions of this script also said to remove `PostToolUse` entries; that was incorrect — hardgate has never installed `PostToolUse` hooks, so there is nothing to remove there.
 4. **Remove CLAUDE.md rule**: Find and remove the Hard Rule block for this target from `~/.claude/CLAUDE.md`. Do NOT remove other rules or renumber them.
 5. **Remove project CLAUDE.md rule**: Same, if a project CLAUDE.md exists.
 6. **Remove memory file**: Delete `~/.claude/projects/*/memory/<target>-gate.md`

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v1.1.0 Sprint 1 — quick wins (7 audit items)
+
+- **(B3, #15)** Step 0 plugin discovery now walks `~/.claude/plugins/` directly instead of `~/.claude/plugins/marketplaces/`. The old subpath only caught Cowork-marketplace installs and missed CLI/manual installs and custom registries.
+- **(B6, #16)** `disable-gate.md` no longer instructs the model to remove `PostToolUse` hook entries from `settings.json`. Hardgate has never installed `PostToolUse` hooks — the line was leftover drift from an earlier install spec. Also added the missing `<target>-stop-check.py` to the deletion list (the `.sh` wrapper was already there but the `.py` script was not).
+- **(B7, #21)** Switched all hook command paths in SKILL.md from `"$CLAUDE_PROJECT_DIR/.claude/hooks/..."` (whole-path quoting) to `"$CLAUDE_PROJECT_DIR"/.claude/hooks/...` (variable-only quoting). Both forms are functionally equivalent in POSIX shells, but variable-only matches Anthropic's documented hook examples and is the convention to follow. Four spots updated: Artifact 1 .sh wrapper, Artifact 2 PreToolUse wiring, Artifact 2 Stop hook for skill targets, Artifact 6 SessionStart wrapper + wiring.
+- **(B2, #22)** README troubleshooting section for "SessionStart announcement missing" now documents that BOTH the flat `{"additionalContext": "..."}` and nested `{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "..."}}` JSON output formats work. Hardgate uses the flat form because it matches Anthropic's documented examples and works in both Claude Code CLI and Cowork. The previous note actively steered users away from the (also valid) nested form.
+- **(U3, #13)** `hard-gate.md` "Do not analyze, plan, or describe what you will do" directive now has an explicit exception for the Step 2 parameter confirmation, which is required before any artifacts are written. Removes the tension between the slash command's terse instruction and SKILL.md Step 2's "confirm with the user in 2-3 sentences" requirement.
+- **(U5, #19)** Behavioral test commands in SKILL.md Step 6 are now portable and self-cleaning. `cat /etc/hosts` (system file, may be restricted on some Linux containers) is now `cat README.md` (file guaranteed to exist in any project). The false-positive test `mkdir /tmp/cat-pics-test` (left an unowned directory behind on every run) is now `TMP=$(mktemp -d) && mkdir "$TMP/cat-shaped-dir" && rm -rf "$TMP"` (exercises the same `mkdir <path-containing-cat>` over-match path, then self-cleans).
+- **(U4, #14)** SKILL.md Step 0 has a new bootstrap-conflict warning: if installing a gate on the context-mode plugin (or any tool that intercepts Bash) AND that tool is already running as a hard gate in this session, the installer's own discovery commands will be blocked. Recommends running the installer in a fresh session where the target gate is not yet active. Keeps the existing `ctx_execute` instruction as the workaround for soft/advisory installs.
+
+### Build artifact
+
+- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 1 SKILL.md changes. New sha256: `8a4ea156ad6c8c860ba82ae6f7c6d9346608e803cb27288b9811d1c63acc94eb`. The CI drift check is updated automatically since the committed zip is the source of truth.
+
 ## [1.0.1] — 2026-04-14
 
 Hotfix release addressing four issues from the v1.0 technical audit and live development findings: a critical scope bug in skill gates, a security gap in the tokenizer, a phantom hook reference, and a UX friction point. Plus the post-v1.0.0 build/CI infrastructure that previously sat in `[Unreleased]`.

@@ -238,7 +238,17 @@ Should return `EXIT: 2` with the BLOCKED marker for forbidden commands, `EXIT: 0
 The gate tokenizes commands and checks the verb, not substrings. If you're seeing false positives, the tokenizer has a bug — file an issue with the exact command that was incorrectly blocked.
 
 **SessionStart announcement missing:**
-The SessionStart hook may use the wrong JSON format. Check that the `.py` script emits `{"additionalContext": "..."}` at the top level, not nested under `hookSpecificOutput`.
+The SessionStart hook isn't emitting context for the new session. Both of these JSON output formats are valid and either will work:
+
+```json
+{"additionalContext": "..."}
+```
+
+```json
+{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "..."}}
+```
+
+Hardgate uses the flat (top-level) form because that matches Anthropic's documented examples and works in both Claude Code CLI and Cowork. If you switched to the nested `hookSpecificOutput` form and it isn't firing, double-check the `hookEventName` field is exactly `"SessionStart"` (case-sensitive). If you switched to the flat form and it isn't firing, make sure the `.py` script is actually emitting JSON on stdout and exiting 0 — try running it manually and inspecting the output.
 
 **Hooks work in CLI but not in Cowork:**
 Make sure hooks are in project-level `.claude/`, not user-level `~/.claude/`. User-level hooks don't fire in Cowork.

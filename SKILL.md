@@ -53,11 +53,15 @@ Advisory artifacts (CLAUDE.md rules, permissions, memory files) can use user-lev
 
 ### Step 0: Discover installed targets
 
+> **(U4) Bootstrap-conflict warning.** If you are installing a gate on the **context-mode** plugin (or any other tool that intercepts Bash) AND that tool is already running as a hard gate in this session, the installer's own discovery commands will be blocked by the existing gate. The cleanest path is to **run the installer in a fresh session where the target gate is not yet active**. The `ctx_execute` workaround below handles soft/advisory installs but is fragile against a fully-active blocking gate.
+
 Run these commands (use ctx_execute if context-mode is loaded, Bash if not):
 
 ```bash
 echo "=== PLUGINS ==="
-ls ~/.claude/plugins/marketplaces/ 2>/dev/null || echo "(none)"
+# (B3) Walk ~/.claude/plugins/ directly — the old `marketplaces/` subpath
+# only catches Cowork-marketplace installs and misses CLI/manual installs.
+ls ~/.claude/plugins/ 2>/dev/null || echo "(none)"
 cat ~/.claude/settings.json 2>/dev/null | grep -A1 enabledPlugins | head -20
 
 echo "=== SKILLS ==="
@@ -145,10 +149,10 @@ Generate and write each artifact IN ORDER. Write each to disk immediately — do
 
 Create `.claude/hooks/<target>-gate.py` (the logic) and `.claude/hooks/<target>-gate.sh` (thin wrapper) in the **project directory**. Make the .sh executable.
 
-The .sh wrapper must use `$CLAUDE_PROJECT_DIR`:
+The .sh wrapper must use `$CLAUDE_PROJECT_DIR`. **(B7)** Quote the variable alone, not the whole path — this matches Anthropic's documented hook examples:
 ```bash
 #!/usr/bin/env bash
-exec python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/<target>-gate.py"
+exec python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/<target>-gate.py
 ```
 
 **For PLUGIN targets**, the .py script must:
@@ -296,7 +300,7 @@ Read the current `.claude/settings.json` (PROJECT-LEVEL). Add the PreToolUse hoo
         "matcher": "Bash",
         "hooks": [{
           "type": "command",
-          "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/<target>-gate.sh\""
+          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/<target>-gate.sh"
         }]
       }
     ]
@@ -304,12 +308,14 @@ Read the current `.claude/settings.json` (PROJECT-LEVEL). Add the PreToolUse hoo
 }
 ```
 
-For SKILL targets, also add a Stop hook:
+**(B7)** Quote the variable alone, not the whole path. Both forms are functionally equivalent in POSIX shells, but variable-only quoting matches Anthropic's documented hook examples and is the convention to follow.
+
+For SKILL targets, also add a Stop hook (same B7 quoting style):
 ```json
 "Stop": [{
   "hooks": [{
     "type": "command",
-    "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/<target>-stop-check.sh\""
+    "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/<target>-stop-check.sh"
   }]
 }]
 ```
@@ -360,10 +366,10 @@ Create `.claude/hooks/<target>-session-start.py` and `.claude/hooks/<target>-ses
 
 The .py script emits top-level `{"additionalContext": "..."}` JSON on stdout. Exit 0.
 
-The .sh wrapper:
+The .sh wrapper (same B7 quoting style):
 ```bash
 #!/usr/bin/env bash
-exec python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/<target>-session-start.py"
+exec python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/<target>-session-start.py
 ```
 
 Make executable. Add to `.claude/settings.json` (PROJECT-LEVEL) under `SessionStart`:
@@ -371,7 +377,7 @@ Make executable. Add to `.claude/settings.json` (PROJECT-LEVEL) under `SessionSt
 "SessionStart": [{
   "hooks": [{
     "type": "command",
-    "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/<target>-session-start.sh\""
+    "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/<target>-session-start.sh"
   }]
 }]
 ```
@@ -445,9 +451,9 @@ Write the filled-in prompt to `.claude/hardgate-test-prompt.txt`, then tell the 
 **Fill in real commands based on the target type:**
 
 For a context-mode plugin gate:
-- Forbidden: `cat /etc/hosts`
+- Forbidden: `cat README.md` — uses a file guaranteed to exist in any project, no system-file restrictions
 - Allowed: `git add .`
-- False positive: `mkdir /tmp/cat-pics-test`
+- False positive: `TMP=$(mktemp -d) && mkdir "$TMP/cat-shaped-dir" && rm -rf "$TMP"` — exercises the `mkdir <path-containing-cat>` over-match path, then self-cleans. Avoids leaving an unowned `/tmp/cat-pics-test` directory behind
 
 For a deliverables skill gate:
 - Forbidden: `git push origin main`

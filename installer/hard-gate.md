@@ -10,4 +10,4 @@ If a target was specified, skip discovery and proceed directly to Step 1 (classi
 
 CRITICAL: All hook scripts and hook wiring go in PROJECT-LEVEL `.claude/` (not `~/.claude/`). User-level hooks do not fire in Cowork. See the COWORK COMPATIBILITY section in the skill.
 
-This is an installation task. Do not analyze, plan, or describe what you will do. Follow the skill's protocol step by step: discover → classify → extract parameters → back up → write all 7 artifacts → verify → behavioral test → report. Every step produces a file or config edit. No step produces only prose.
+This is an installation task. Do not analyze, plan, or describe what you will do — **except for the Step 2 parameter confirmation, which is required before writing any artifacts.** Follow the skill's protocol step by step: discover → classify → extract parameters → confirm with user (Step 2) → back up → write all 7 artifacts → verify → behavioral test → report. Every step produces a file or config edit. No step produces only prose.
