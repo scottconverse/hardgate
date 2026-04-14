@@ -37,7 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Build artifact
 
-- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 4 SKILL.md changes. New sha256: `5cbdb29e96a4d9c048f1a858a739b26d9f9b2130a8dcdc17eec9164807e9d599`. The CI drift check is updated automatically since the committed zip is the source of truth.
+### v1.1.0 Sprint 5 — X2 Per-project deliverables.json (isolated PR)
+
+- **(X2, #5)** `coder-ui-qa-test-gate.py` now checks for `.claude/deliverables.json` before running hardcoded deliverable checks. Present + valid → use config; absent → fall back to hardcoded (zero behavior change for existing installs); malformed → fail-closed (exit 2 with JSON error line/col/message); invalid schema → fail-closed with descriptive message. Config format: `{"version":1,"required":[{"name":"...","glob":"alt1|alt2","optional":false}]}`. Glob is a `|`-delimited alternates string; each alternate is fed to `glob.glob(recursive=True)`; first file match wins. `optional:true` entries emit `WARN: {name} missing (optional)` to stderr but do not affect the exit code. Step 2 of the install protocol now prompts the user to confirm whether standard deliverables apply, and writes a custom config if not. All 6 behavioral tests pass (malformed, all-present, missing-required, optional-missing, absent-fallback, pipe-alternates).
+
+### Build artifact
+
+- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 5 SKILL.md changes. New sha256: `a63160da2e5a268755a1d097ff1b6dcdcff08f7d27a5b79a6c305167453fedaf`. The CI drift check is updated automatically since the committed zip is the source of truth.
 
 ## [1.0.1] — 2026-04-14
 
