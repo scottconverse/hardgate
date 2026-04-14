@@ -138,7 +138,7 @@ To get different gate behavior in a sub-project, open a new Claude Code / Cowork
 After installation, you can test the gate script directly without restarting:
 
 ```
-python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"cat /etc/hosts"}}'
+python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"cat README.md"}}'
 echo "exit=$?"
 ```
 
