@@ -116,6 +116,20 @@ Read the target's files (SKILL.md, README, manifest, command file). Extract:
 - RULE_NUMBER: Next available Hard Rule number.
 - RULE_NAME: Short name.
 
+**Deriving RULE_NUMBER:**
+
+Run this before writing any artifacts to get the next available Hard Rule number:
+
+```python
+import re, pathlib
+text = pathlib.Path('~/.claude/CLAUDE.md').expanduser().read_text(encoding='utf-8', errors='replace')
+nums = [int(n) for n in re.findall(r'Hard Rule (\d+)', text)]
+rule_number = max(nums) + 1 if nums else 1
+print(f"Next Hard Rule number: {rule_number}")
+```
+
+If the file is empty or has no Hard Rules, start at 1. Use the printed number as `{{RULE_NUMBER}}` throughout all artifacts.
+
 Confirm with the user in 2-3 sentences what you found. Example: "I'll block [X] and require [Y]. [Z] will still work normally. Correct?"
 
 Proceed on confirmation.
@@ -386,12 +400,25 @@ Make executable. Add to `.claude/settings.json` (PROJECT-LEVEL) under `SessionSt
 
 #### ARTIFACT 7: Memory file
 
-Find the current project's memory directory:
-```bash
-ls -d ~/.claude/projects/*/memory/ 2>/dev/null | head -5
+Derive the memory directory path deterministically from `$CLAUDE_PROJECT_DIR`. Claude Code encodes the project path by replacing each `:`, `/`, and `\` with a single `-`.
+
+```python
+import os, re, pathlib
+project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '')
+encoded = re.sub(r'[:/\\]', '-', project_dir)
+memory_dir = pathlib.Path.home() / '.claude' / 'projects' / encoded / 'memory'
+memory_dir.mkdir(parents=True, exist_ok=True)
+print(memory_dir)
 ```
 
-Create `~/.claude/projects/<project>/memory/<target>-gate.md` with a summary of the gate.
+Or in Bash (if Python is unavailable):
+```bash
+encoded=$(python3 -c "import os,re; p=os.environ.get('CLAUDE_PROJECT_DIR',''); print(re.sub(r'[:/\\\\]','-',p))")
+memory_dir="$HOME/.claude/projects/${encoded}/memory"
+mkdir -p "$memory_dir"
+```
+
+Create `${memory_dir}/{{TARGET}}-gate.md` with a summary of the gate.
 
 ---
 
@@ -401,17 +428,36 @@ Run a single verification pass:
 
 ```bash
 echo "=== ARTIFACT CHECK ==="
-echo "1.  Hook script:      " && ls -la .claude/hooks/{{TARGET}}-gate.sh .claude/hooks/{{TARGET}}-gate.py
+
+# Derive memory dir deterministically (B4)
+ENCODED=$(python3 -c "import os,re; p=os.environ.get('CLAUDE_PROJECT_DIR',''); print(re.sub(r'[:/\\\\]','-',p))")
+MEMORY_DIR="$HOME/.claude/projects/${ENCODED}/memory"
+
+echo "1.  Hook script:      " && ls -la .claude/hooks/{{TARGET}}-gate.sh .claude/hooks/{{TARGET}}-gate.py || { echo "ARTIFACT 1 MISSING — gate .sh and .py not found"; exit 1; }
+
 # B1: stop-check is required for SKILL targets only — skip for plugin/shortcut.
 if [ "{{TARGET_TYPE}}" = "skill" ]; then
-  echo "1.5 Stop-check:       " && ls -la .claude/hooks/{{TARGET}}-stop-check.sh .claude/hooks/{{TARGET}}-stop-check.py || { echo "MISSING — Stop hook will silently fail"; exit 1; }
+  echo "1.5 Stop-check:       " && ls -la .claude/hooks/{{TARGET}}-stop-check.sh .claude/hooks/{{TARGET}}-stop-check.py || { echo "ARTIFACT 1.5 MISSING — stop-check scripts not found"; exit 1; }
 fi
-echo "2.  Project settings: " && python3 -c "import json; d=json.load(open('.claude/settings.json')); print('hooks:', list(d.get('hooks',{}).keys()))"
-echo "3. User permissions: " && python3 -c "import json; d=json.load(open('$HOME/.claude/settings.json')); print('permissions:', len(d.get('permissions',{}).get('allow',[])),'allow entries')"
-echo "4. Global CLAUDE.md: " && grep -c "Hard Rule {{RULE_NUMBER}}" ~/.claude/CLAUDE.md
-echo "5. Project CLAUDE.md:" && grep -c "Hard Rule {{RULE_NUMBER}}" ./CLAUDE.md 2>/dev/null || echo "(no project CLAUDE.md)"
-echo "6. SessionStart:     " && ls -la .claude/hooks/{{TARGET}}-session-start.sh
-echo "7. Memory file:      " && ls ~/.claude/projects/*/memory/{{TARGET}}-gate.md 2>/dev/null || echo "(memory file location TBD)"
+
+echo "2.  Project settings: " && python3 -c "import json; d=json.load(open('.claude/settings.json')); print('hooks:', list(d.get('hooks',{}).keys()))" || { echo "ARTIFACT 2 MISSING — .claude/settings.json not found or malformed"; exit 1; }
+
+echo "3.  User permissions: " && python3 -c "import json,pathlib; d=json.loads(pathlib.Path.home().joinpath('.claude/settings.json').read_text()); print('permissions:', len(d.get('permissions',{}).get('allow',[])),'allow entries')" || { echo "ARTIFACT 3 MISSING — ~/.claude/settings.json not found or malformed"; exit 1; }
+
+# D5: derive count and assert exactly 1 occurrence (missing = 0, collision = >1)
+count4=$(grep -c "Hard Rule {{RULE_NUMBER}}" ~/.claude/CLAUDE.md 2>/dev/null || echo 0)
+[ "$count4" -ge 1 ] || { echo "ARTIFACT 4 MISSING — Hard Rule {{RULE_NUMBER}} not found in ~/.claude/CLAUDE.md"; exit 1; }
+[ "$count4" -eq 1 ] || { echo "ARTIFACT 4 COLLISION: found ${count4} occurrences of 'Hard Rule {{RULE_NUMBER}}' in ~/.claude/CLAUDE.md — expected exactly 1"; exit 1; }
+echo "4.  Global CLAUDE.md: Hard Rule {{RULE_NUMBER}} present (${count4} occurrence)"
+
+# Artifact 5 is intentionally soft: user may not be in a project directory
+echo "5.  Project CLAUDE.md:" && grep -c "Hard Rule {{RULE_NUMBER}}" ./CLAUDE.md 2>/dev/null || echo "(no project CLAUDE.md — OK if not in a project dir)"
+
+echo "6.  SessionStart:     " && ls -la .claude/hooks/{{TARGET}}-session-start.sh .claude/hooks/{{TARGET}}-session-start.py || { echo "ARTIFACT 6 MISSING — session-start scripts not found"; exit 1; }
+
+echo "7.  Memory file:      " && ls "${MEMORY_DIR}/{{TARGET}}-gate.md" || { echo "ARTIFACT 7 MISSING — ${MEMORY_DIR}/{{TARGET}}-gate.md not found"; exit 1; }
+
+echo "=== ALL ARTIFACTS VERIFIED ==="
 ```
 
 If ANY artifact is missing, fix it before proceeding. Do not skip.

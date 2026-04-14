@@ -17,9 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **(U5, #19)** Behavioral test commands in SKILL.md Step 6 are now portable and self-cleaning. `cat /etc/hosts` (system file, may be restricted on some Linux containers) is now `cat README.md` (file guaranteed to exist in any project). The false-positive test `mkdir /tmp/cat-pics-test` (left an unowned directory behind on every run) is now `TMP=$(mktemp -d) && mkdir "$TMP/cat-shaped-dir" && rm -rf "$TMP"` (exercises the same `mkdir <path-containing-cat>` over-match path, then self-cleans).
 - **(U4, #14)** SKILL.md Step 0 has a new bootstrap-conflict warning: if installing a gate on the context-mode plugin (or any tool that intercepts Bash) AND that tool is already running as a hard gate in this session, the installer's own discovery commands will be blocked. Recommends running the installer in a fresh session where the target gate is not yet active. Keeps the existing `ctx_execute` instruction as the workaround for soft/advisory installs.
 
+### v1.1.0 Sprint 2 — Correctness (3 issues)
+
+- **(B4, #7)** Artifact 7 memory path is now derived deterministically from `CLAUDE_PROJECT_DIR` using `re.sub(r'[:/\\]', '-', path)` — the same encoding Claude Code uses for its `~/.claude/projects/` subdirectory names. Replaces the `ls -d ~/.claude/projects/*/memory/` glob that could match every project simultaneously and forced the model to guess. `mkdir -p` (or Python `mkdir(parents=True, exist_ok=True)`) ensures the directory is created if it doesn't exist yet.
+- **(B5, #8)** Step 5 verification now hard-fails for artifacts 1, 2, 3, 4, 6, and 7. Each check uses `|| { echo "ARTIFACT N MISSING — <description>"; exit 1; }` instead of the previous `|| echo "(TBD)"` / `|| echo "(memory file location TBD)"` soft fallbacks that would let a partial installation pass silently. Artifact 5 (project CLAUDE.md) intentionally remains soft — a user running the installer outside a project directory is valid, not an error.
+- **(D5, #18)** Rule number derivation is now explicit in Step 2. A Python snippet reads `~/.claude/CLAUDE.md`, collects all `Hard Rule N` headings via regex, and returns `max(N) + 1` (defaults to 1 if none exist). Step 5 now includes a collision guard that asserts exactly 1 occurrence of the new rule number was written — catches both missing-write and duplicate-write bugs.
+- **CI action versions bumped**: `actions/checkout@v4→v6`, `actions/setup-python@v5→v6` to silence Node.js 20 deprecation warnings surfaced in the Sprint 1 run audit.
+
 ### Build artifact
 
-- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 1 SKILL.md changes. New sha256: `8a4ea156ad6c8c860ba82ae6f7c6d9346608e803cb27288b9811d1c63acc94eb`. The CI drift check is updated automatically since the committed zip is the source of truth.
+- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 2 SKILL.md changes. New sha256: `e29df67fd9db9cc110a4ada38815bd3f2336b93be718fff04b202313f52a0d1b`. The CI drift check is updated automatically since the committed zip is the source of truth.
 
 ## [1.0.1] — 2026-04-14
 
