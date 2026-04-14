@@ -1,0 +1,32 @@
+Discussions seeded: 2026-04-14
+Author: Scott Converse
+
+Starter posts to create once GitHub Discussions is enabled on the repo:
+
+Category: Announcements
+  Title: hardgate v1.0 — 7-location enforcement for Claude Code
+  Body:  See README.md and USER-MANUAL.md. Built after two days of
+         watching Claude Code ignore a context-mode plugin.
+
+Category: Q&A
+  Title: Why won't my user-level hook fire in Cowork?
+  Body:  User-level hooks (~/.claude/settings.json hooks block,
+         ~/.claude/hooks/) do not fire in Cowork's Code tab. Known
+         platform limitation — see GitHub issue anthropics/claude-code#27398.
+         hardgate installs at project-level .claude/ automatically.
+
+Category: Ideas
+  Title: What should hardgate gate next?
+  Body:  Share your plugin/skill/shortcut that Claude Code keeps ignoring.
+         Good candidates: token-saving plugins, quality gates, TDD process
+         enforcement, pre-commit checks.
+
+Category: Show and tell
+  Title: Post your hardgate install
+  Body:  Paste the 7-artifact install log for a gate you installed.
+         Especially interesting: creative uses beyond context-mode and
+         deliverables gates.
+
+To seed these on the live repo:
+  gh api -X POST /repos/scottconverse/hardgate/discussions \
+    -f category_id=<id> -f title="..." -f body="..."

@@ -1,0 +1,59 @@
+%% hardgate architecture — 7-location enforcement model
+%% Rendered: https://mermaid.live
+
+flowchart TB
+    User([User invokes<br/>/hard-gate]) --> Skill[hard-gate-installer<br/>SKILL.md]
+    Skill --> Discover[Step 0: Discover<br/>plugins / skills / commands]
+    Discover --> Classify[Step 1: Classify target<br/>plugin · skill · shortcut]
+    Classify --> Extract[Step 2: Extract params<br/>forbidden/allowed patterns]
+    Extract --> Backup[Step 3: Backup<br/>existing settings.json]
+    Backup --> Write[Step 4: Write 7 artifacts]
+
+    subgraph L3 [Level 3 — BLOCKING exit 2]
+        A1[1. Hook script<br/>.claude/hooks/*-gate.sh+.py]
+        A2[2. Project settings.json<br/>PreToolUse wiring]
+        A3[3. User settings.json<br/>permissions.allow]
+    end
+
+    subgraph L2 [Level 2 — REMINDER]
+        A6[6. SessionStart hook<br/>additionalContext JSON]
+        A7[7. Memory file<br/>per-turn reminder]
+    end
+
+    subgraph L1 [Level 1 — ADVISORY]
+        A4[4. Global CLAUDE.md<br/>Hard Rule N]
+        A5[5. Project CLAUDE.md<br/>Hard Rule N]
+    end
+
+    Write --> A1
+    Write --> A2
+    Write --> A3
+    Write --> A4
+    Write --> A5
+    Write --> A6
+    Write --> A7
+
+    A1 --> Verify[Step 5: Verify<br/>all 7 exist]
+    A2 --> Verify
+    A3 --> Verify
+    A4 --> Verify
+    A5 --> Verify
+    A6 --> Verify
+    A7 --> Verify
+
+    Verify --> Test[Step 6: Behavioral test<br/>restart session · paste prompt]
+    Test --> Report[Step 7: Report<br/>pass/fail table]
+
+    %% Runtime enforcement path
+    CC([Claude Code<br/>attempts Bash]) -.PreToolUse.-> Hook{Hook<br/>.sh wrapper}
+    Hook -.exec.-> Py[Python tokenizer<br/>strip env + path prefix]
+    Py -.match forbidden.-> Block[stderr: HARD-RULE-N BLOCKED<br/>exit 2]
+    Py -.no match.-> Allow[exit 0 · tool proceeds]
+    Block -.-> CC
+
+    classDef blocking fill:#ffd6d6,stroke:#b00,stroke-width:2px
+    classDef reminder fill:#fff4cc,stroke:#b88,stroke-width:1px
+    classDef advisory fill:#d6f0ff,stroke:#048,stroke-width:1px
+    class A1,A2,A3,Block blocking
+    class A6,A7 reminder
+    class A4,A5 advisory
