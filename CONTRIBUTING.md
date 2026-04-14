@@ -23,7 +23,7 @@ hardgate/
 │   ├── install.ps1           # PowerShell installer (Windows)
 │   └── INSTALLER-README.md
 ├── dist/
-│   └── hardgate-v1.0.0.zip   # Built offline installer (attached to Releases)
+│   └── hardgate-v1.0.1.zip   # Built offline installer (attached to Releases)
 └── .github/
     └── DISCUSSIONS_SEEDED    # Marker + drafts for seed discussion posts
 ```
@@ -47,11 +47,11 @@ python3 scripts/build-docs.py
 To rebuild the offline installer zip reproducibly from `installer/` (syncs the canonical `SKILL.md`, `hard-gate.md`, `disable-gate.md` from the repo root first):
 
 ```bash
-python3 scripts/build-installer.py            # builds v1.0.0 to dist/
+python3 scripts/build-installer.py            # builds v1.0.1 to dist/
 python3 scripts/build-installer.py 1.1.0      # builds v1.1.0 to dist/
 ```
 
-The build is deterministic — identical inputs produce a byte-identical zip. CI enforces this via a drift check (`.github/workflows/ci.yml`) that rebuilds from source in a tmpdir and compares sha256 against the committed `dist/hardgate-v1.0.0.zip`.
+The build is deterministic — identical inputs produce a byte-identical zip. CI enforces this via a drift check (`.github/workflows/ci.yml`) that rebuilds from source in a tmpdir and compares sha256 against the committed `dist/hardgate-v1.0.1.zip`.
 
 ## Testing your changes
 

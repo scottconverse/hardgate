@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot  = Split-Path -Parent $ScriptDir
-$Zip       = Join-Path $RepoRoot 'dist\hardgate-v1.0.0.zip'
+$Zip       = Join-Path $RepoRoot 'dist\hardgate-v1.0.1.zip'
 
 if (-not (Test-Path $Zip)) {
     Write-Error "Installer zip not found: $Zip`nRun: python scripts/build-installer.py"
@@ -47,7 +47,7 @@ try {
     Write-Host ""
     Write-Host "=== TEST 2: install.ps1 happy path ==="
     Expand-Archive -Path $Zip -DestinationPath $Work -Force
-    $Extracted = Join-Path $Work 'hardgate-v1.0.0'
+    $Extracted = Join-Path $Work 'hardgate-v1.0.1'
     if (Test-Path $Extracted) { Pass "extracted directory exists" }
     else { Fail "missing extracted dir"; return }
 

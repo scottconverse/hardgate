@@ -7,7 +7,7 @@ installer/, and produces dist/hardgate-v<VERSION>.zip with deterministic
 timestamps and permissions so repeat builds yield byte-identical output.
 
 Usage:
-    python3 scripts/build-installer.py             # build v1.0.0 (default)
+    python3 scripts/build-installer.py             # build v1.0.1 (default)
     python3 scripts/build-installer.py 1.1.0       # build v1.1.0
     python3 scripts/build-installer.py --check     # build and diff against
                                                      committed dist/ zip
@@ -22,7 +22,7 @@ import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_VERSION = "1.0.0"
+DEFAULT_VERSION = "1.0.1"
 
 # Files that ship unchanged from the repo root into the installer
 SKILL_FILES = ("SKILL.md", "hard-gate.md", "disable-gate.md")
@@ -92,7 +92,7 @@ def main() -> int:
         "version",
         nargs="?",
         default=DEFAULT_VERSION,
-        help=f"Version string, e.g. 1.0.0 (default: {DEFAULT_VERSION})",
+        help=f"Version string, e.g. 1.0.1 (default: {DEFAULT_VERSION})",
     )
     parser.add_argument(
         "--check",

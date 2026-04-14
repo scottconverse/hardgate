@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-ZIP="$REPO_ROOT/dist/hardgate-v1.0.0.zip"
+ZIP="$REPO_ROOT/dist/hardgate-v1.0.1.zip"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -17,7 +17,7 @@ unzip -qq -t "$ZIP" && pass "zip CRC ok" || fail "zip corrupt"
 echo
 echo "=== TEST 2: install.sh happy path ==="
 unzip -qq "$ZIP" -d "$WORK"
-EXTRACTED="$WORK/hardgate-v1.0.0"
+EXTRACTED="$WORK/hardgate-v1.0.1"
 [ -d "$EXTRACTED" ] && pass "extracted directory exists" || fail "missing extracted dir"
 chmod +x "$EXTRACTED/install.sh"
 

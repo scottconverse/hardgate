@@ -52,15 +52,15 @@ jobs:
           # Copy the repo to a tmpdir so the build doesn't touch dist/ in place
           cp -r . "$TMP/hardgate"
           cd "$TMP/hardgate"
-          python scripts/build-installer.py 1.0.0
-          BUILT_HASH="$(sha256sum dist/hardgate-v1.0.0.zip | awk '{print $1}')"
+          python scripts/build-installer.py 1.0.1
+          BUILT_HASH="$(sha256sum dist/hardgate-v1.0.1.zip | awk '{print $1}')"
           echo "built_hash=$BUILT_HASH" >> "$GITHUB_OUTPUT"
 
       - name: Hash the committed zip
         id: committed
         run: |
           set -euo pipefail
-          COMMITTED_HASH="$(sha256sum dist/hardgate-v1.0.0.zip | awk '{print $1}')"
+          COMMITTED_HASH="$(sha256sum dist/hardgate-v1.0.1.zip | awk '{print $1}')"
           echo "committed_hash=$COMMITTED_HASH" >> "$GITHUB_OUTPUT"
 
       - name: Compare
@@ -71,8 +71,8 @@ jobs:
           echo "built:     $BUILT"
           echo "committed: $COMMITTED"
           if [ "$BUILT" != "$COMMITTED" ]; then
-            echo "::error::installer drift: dist/hardgate-v1.0.0.zip does not match a fresh build from source."
-            echo "::error::Rebuild with: python scripts/build-installer.py 1.0.0"
+            echo "::error::installer drift: dist/hardgate-v1.0.1.zip does not match a fresh build from source."
+            echo "::error::Rebuild with: python scripts/build-installer.py 1.0.1"
             exit 1
           fi
           echo "OK — committed installer matches source."

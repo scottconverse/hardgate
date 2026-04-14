@@ -155,28 +155,130 @@ exec python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/<target>-gate.py"
 - Read JSON from stdin
 - Check `tool_name` is "Bash" (exit 0 if not)
 - Tokenize the command into sub-commands (split on ;, |, &&, ||)
-- Strip leading env-var assignments and path prefixes from each verb
+- Strip leading env-var assignments, sudo/env/command/exec/time/nohup wrappers, and path prefixes from each verb
 - Check if the verb matches the FORBIDDEN set
+- **(D2) Detect shell-c bypass:** if the verb is `sh|bash|zsh|dash|ash|ksh` and the next token is `-c`, recursively re-tokenize the `-c` argument using `shlex.split()` and apply the same forbidden-verb check. Cap recursion at depth 2. **Fail-closed** on unparseable `-c` arguments — block the call rather than letting it through.
+- **(D2) Detect interpreter inline-code bypass:** if the verb is `python|python2|python3|perl|ruby|node|deno|php` and the args contain the inline-code flag (`-c` for python/php, `-e`/`--eval` for perl/ruby/node, `eval` for deno), block outright. There is no reliable way to statically analyze arbitrary inline code, so the only safe action is refuse.
 - If match: print `[HARD-RULE-{{RULE_NUMBER}}] BLOCKED by {{RULE_NAME}}` to stderr, exit 2
 - If no match: exit 0 silently
-- Fail-open: if JSON parsing fails, exit 0
+- Fail-open on outer JSON parsing errors: if `sys.stdin` cannot be parsed at all, exit 0. Fail-closed only applies to the inner `-c` argument re-parsing.
+
+Reference tokenizer constants:
+
+```python
+SHELL_INTERPRETERS = {"sh", "bash", "zsh", "dash", "ash", "ksh"}
+SCRIPT_INTERPRETERS = {
+    "python":  ("-c",),
+    "python2": ("-c",),
+    "python3": ("-c",),
+    "perl":    ("-e",),
+    "ruby":    ("-e",),
+    "node":    ("-e", "--eval"),
+    "deno":    ("eval",),
+    "php":     ("-r",),
+}
+MAX_SHELL_C_DEPTH = 2
+```
 
 **For SKILL targets**, the .py script must:
 - Read JSON from stdin
 - Check if the command matches GATE_COMMANDS (git push, git commit, gh release, etc.)
-- If match: check for required deliverables relative to `CLAUDE_PROJECT_DIR`
-- If any missing: print blocked message listing missing items to stderr, exit 2
+- **(X1) Resolve the project root from the git repo the user is actually pushing from**, NOT from `$CLAUDE_PROJECT_DIR` directly. The session's `$CLAUDE_PROJECT_DIR` is fixed at session start and points at the Cowork session root, not the sub-project being pushed. Use this resolution order:
+  1. Parse a leading `cd <path> && ...` from the command string. Handles double-quoted, single-quoted, and bareword paths. This is the most common pattern Claude Code uses to navigate into a sub-project before running git.
+  2. Use `tool_input.cwd` if a test harness or wrapper provides it (the real Bash tool payload does NOT include this field, but tests may inject it).
+  3. Fall back to `os.getcwd()` of the hook process — which equals the session's project dir.
+  4. From whichever cwd was chosen, run `git rev-parse --show-toplevel` to find the actual repo root.
+  5. If not in a git repo, fall back to `$CLAUDE_PROJECT_DIR`, then `os.getcwd()`.
+- If match: check for required deliverables relative to the resolved project root
+- If any missing: print blocked message listing missing items AND the resolved project root to stderr, exit 2
 - If all present: exit 0
+
+Reference implementation:
+
+```python
+import os, re, subprocess
+
+# Parse a leading `cd <path> && ...` from the command string.
+# Handles "double quoted", 'single quoted', and bareword paths.
+_LEADING_CD = re.compile(
+    r'^\s*cd\s+(?:--\s+)?(?:"([^"]+)"|\'([^\']+)\'|(\S+))\s*(?:&&|;|$)'
+)
+
+def detect_cwd_from_payload(payload):
+    ti = payload.get("tool_input") or {}
+    if ti.get("cwd"):
+        return ti["cwd"]
+    cmd = ti.get("command") or ""
+    m = _LEADING_CD.match(cmd)
+    if m:
+        path = m.group(1) or m.group(2) or m.group(3)
+        path = os.path.expandvars(os.path.expanduser(path))
+        if os.path.isdir(path):
+            return path
+    return os.getcwd()
+
+def find_project_root(payload):
+    cwd = detect_cwd_from_payload(payload)
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=cwd, capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            top = r.stdout.strip()
+            if top and os.path.isdir(top):
+                return top
+    except Exception:
+        pass
+    return os.environ.get("CLAUDE_PROJECT_DIR") or cwd or "."
+```
 
 **For SHORTCUT targets**: exit 0 with a reminder on stderr (nag only, not blocking).
 
 After writing both files: `chmod +x .claude/hooks/<target>-gate.sh`
 
-**Unit test immediately after writing:**
+**Unit test immediately after writing** (assert exit code, do not just echo it):
 ```bash
-python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"<FORBIDDEN_COMMAND>"}}' 2>&1 ; echo "EXIT: $?"
+RESULT=$(python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"<FORBIDDEN_COMMAND>"}}' 2>&1)
+EXIT=$?
+[ "$EXIT" = "2" ] || { echo "GATE UNIT TEST FAILED (exit=$EXIT) — install cannot proceed"; echo "$RESULT"; exit 1; }
+echo "UNIT TEST PASSED: $RESULT"
 ```
 Must return EXIT: 2 with the HARD-RULE marker. If not, fix before proceeding.
+
+---
+
+#### ARTIFACT 1.5: Stop-check hook (SKILL targets only)
+
+**(B1) For SKILL targets, also create `.claude/hooks/<target>-stop-check.sh` and `.claude/hooks/<target>-stop-check.py`.** This is the script the Stop hook in Artifact 2 wires up. Without this artifact, the Stop hook entry points at a non-existent file and silently fails — the deliverable check at end-of-turn never runs.
+
+The .sh wrapper:
+```bash
+#!/usr/bin/env bash
+exec python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/<target>-stop-check.py"
+```
+
+The .py script must:
+- Read JSON from stdin (Stop hook payload contains `last_assistant_message` and `stop_hook_active`)
+- If `stop_hook_active` is true, exit 0 immediately (prevents infinite loops where the stop-check itself triggers another Stop event)
+- Inspect `last_assistant_message` for push/release/publish intent signals (e.g., regex on `git\s+push|gh\s+release\s+create|npm\s+publish|python3?\s+-m\s+build`)
+- If no intent detected, exit 0
+- If intent detected, resolve the project root using the **same X1 git-root logic from Artifact 1** (do not use `$CLAUDE_PROJECT_DIR` directly)
+- Verify the same deliverables that Artifact 1's PreToolUse gate verifies
+- If any are missing, output `{"decision": "block", "reason": "Hard Rule {{RULE_NUMBER}}: missing deliverables: <list>"}` on stdout and exit 0 (Stop hooks block via JSON `decision`, not exit code)
+- If all deliverables present, exit 0
+
+After writing both files: `chmod +x .claude/hooks/<target>-stop-check.sh`
+
+**Unit test the stop-check too:**
+```bash
+RESULT=$(python3 .claude/hooks/<target>-stop-check.py <<< '{"stop_hook_active":false,"last_assistant_message":"now i will git push origin main"}' 2>&1)
+EXIT=$?
+[ "$EXIT" = "0" ] || { echo "STOP-CHECK UNIT TEST FAILED (exit=$EXIT) — install cannot proceed"; echo "$RESULT"; exit 1; }
+echo "STOP-CHECK UNIT TEST PASSED: $RESULT"
+```
+
+The stop-check should produce a `{"decision":"block",...}` JSON message on stdout if deliverables are missing. Visually confirm the output contains either `block` (deliverables missing) or is empty (deliverables satisfied).
 
 ---
 
@@ -293,8 +395,12 @@ Run a single verification pass:
 
 ```bash
 echo "=== ARTIFACT CHECK ==="
-echo "1. Hook script:      " && ls -la .claude/hooks/{{TARGET}}-gate.sh .claude/hooks/{{TARGET}}-gate.py
-echo "2. Project settings: " && python3 -c "import json; d=json.load(open('.claude/settings.json')); print('hooks:', list(d.get('hooks',{}).keys()))"
+echo "1.  Hook script:      " && ls -la .claude/hooks/{{TARGET}}-gate.sh .claude/hooks/{{TARGET}}-gate.py
+# B1: stop-check is required for SKILL targets only — skip for plugin/shortcut.
+if [ "{{TARGET_TYPE}}" = "skill" ]; then
+  echo "1.5 Stop-check:       " && ls -la .claude/hooks/{{TARGET}}-stop-check.sh .claude/hooks/{{TARGET}}-stop-check.py || { echo "MISSING — Stop hook will silently fail"; exit 1; }
+fi
+echo "2.  Project settings: " && python3 -c "import json; d=json.load(open('.claude/settings.json')); print('hooks:', list(d.get('hooks',{}).keys()))"
 echo "3. User permissions: " && python3 -c "import json; d=json.load(open('$HOME/.claude/settings.json')); print('permissions:', len(d.get('permissions',{}).get('allow',[])),'allow entries')"
 echo "4. Global CLAUDE.md: " && grep -c "Hard Rule {{RULE_NUMBER}}" ~/.claude/CLAUDE.md
 echo "5. Project CLAUDE.md:" && grep -c "Hard Rule {{RULE_NUMBER}}" ./CLAUDE.md 2>/dev/null || echo "(no project CLAUDE.md)"
@@ -310,9 +416,9 @@ If ANY artifact is missing, fix it before proceeding. Do not skip.
 
 **You MUST restart the session before testing.** Hooks load at session start. A new session has no memory of this installation, so you cannot just say "run behavioral tests" — CC won't know what you mean.
 
-**Generate a paste-ready test prompt.** Build it from this template, filling in the actual commands for the target(s) you just gated. Give it to the user with this message:
+**Generate a paste-ready test prompt** and **(U1) write it to disk** so the user can find it after the restart wipes the previous session's transcript from view. The file goes at `.claude/hardgate-test-prompt.txt`, project-level.
 
-"Gate installed. Restart the Code tab now, then paste this into the new session:"
+Build the prompt from this template, filling in the actual commands for the target(s) you just gated:
 
 ```
 Test the hardgate hooks installed in this project. Run these commands
@@ -326,6 +432,15 @@ via Bash and report what happens for each:
 Report a table: Test | Expected | Actual | Pass/Fail
 Do not fix anything if a test fails. Just report.
 ```
+
+Write the filled-in prompt to `.claude/hardgate-test-prompt.txt`, then tell the user:
+
+> Gate installed. Test prompt saved to `.claude/hardgate-test-prompt.txt`.
+>
+> 1. Restart the Code tab.
+> 2. Open `.claude/hardgate-test-prompt.txt` in the new session.
+> 3. Paste its contents into the new session as a message to me.
+> 4. I'll run the tests and report a pass/fail table.
 
 **Fill in real commands based on the target type:**
 
