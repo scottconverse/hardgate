@@ -1,0 +1,31 @@
+# Normalize all text files to LF in the repo and on checkout, regardless
+# of platform. Without this, Windows clones get CRLF in the working tree
+# and the installer test harness sha256 comparison fails on the runner
+# (which uses LF) vs the locally-built zip (which would otherwise carry CRLF).
+
+* text=auto eol=lf
+
+# Treat shell scripts as text + LF (already covered by * but explicit is clearer)
+*.sh    text eol=lf
+*.bash  text eol=lf
+
+# PowerShell scripts work fine with either CRLF or LF, but pin to LF for
+# parity with the bash side and to keep zip contents identical across
+# build hosts.
+*.ps1   text eol=lf
+
+# Markdown / source files
+*.md    text eol=lf
+*.py    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# Binary formats — never touch
+*.zip   binary
+*.docx  binary
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
