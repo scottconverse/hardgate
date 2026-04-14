@@ -57,7 +57,31 @@ Level 3 is the one that matters. The model cannot bypass a hook that returns `ex
 
 ## Install
 
-### 1. Copy the files
+Download the latest release zip and run the installer for your platform:
+
+**macOS / Linux:**
+```bash
+curl -L https://github.com/scottconverse/hardgate/releases/latest/download/hardgate-v1.0.1.zip -o hardgate.zip
+unzip hardgate.zip -d hardgate
+cd hardgate
+bash install.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://github.com/scottconverse/hardgate/releases/latest/download/hardgate-v1.0.1.zip" -OutFile hardgate.zip
+Expand-Archive hardgate.zip -DestinationPath hardgate
+pwsh -File hardgate\install.ps1
+```
+
+The installer copies SKILL.md and the two slash commands to `~/.claude/` automatically.
+
+### After install
+
+Restart the Code tab (or Claude Code CLI), then type `/hard-gate`. You should see a discovery list of your installed plugins, skills, and commands, followed by "Which one do you want to gate?"
+
+<details>
+<summary>Manual install (alternative)</summary>
 
 Place these three files from this repo:
 
@@ -67,8 +91,6 @@ Place these three files from this repo:
 | `hard-gate.md` | `~/.claude/commands/hard-gate.md` |
 | `disable-gate.md` | `~/.claude/commands/disable-gate.md` |
 
-You can do this manually, or paste this into a Claude Code session:
-
 ```bash
 mkdir -p ~/.claude/skills/hard-gate-installer
 mkdir -p ~/.claude/commands
@@ -76,13 +98,7 @@ mkdir -p ~/.claude/commands
 
 Then create each file with the contents from this repo.
 
-### 2. Restart
-
-Restart the Code tab (or Claude Code CLI). The skill and commands load at session start.
-
-### 3. Verify
-
-Type `/hard-gate` in the Code tab. You should see a discovery list of your installed plugins, skills, and commands, followed by "Which one do you want to gate?"
+</details>
 
 ---
 

@@ -41,9 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **(X2, #5)** `coder-ui-qa-test-gate.py` now checks for `.claude/deliverables.json` before running hardcoded deliverable checks. Present + valid → use config; absent → fall back to hardcoded (zero behavior change for existing installs); malformed → fail-closed (exit 2 with JSON error line/col/message); invalid schema → fail-closed with descriptive message. Config format: `{"version":1,"required":[{"name":"...","glob":"alt1|alt2","optional":false}]}`. Glob is a `|`-delimited alternates string; each alternate is fed to `glob.glob(recursive=True)`; first file match wins. `optional:true` entries emit `WARN: {name} missing (optional)` to stderr but do not affect the exit code. Step 2 of the install protocol now prompts the user to confirm whether standard deliverables apply, and writes a custom config if not. All 6 behavioral tests pass (malformed, all-present, missing-required, optional-missing, absent-fallback, pipe-alternates).
 
+### v1.1.0 Sprint 6 — U7 installer-led README + D1 if-field hook pre-filter (finish line)
+
+- **(U7, #12)** `README.md` and `INSTALL.md` Install sections now lead with the release zip + `install.sh` / `install.ps1` one-liners. Manual file-copy instructions demoted to a `<details>` collapsible block. Users downloading from GitHub Releases get a working installer without navigating the file map.
+- **(D1, #6)** SKILL.md Artifact 2 PreToolUse hook template now documents an `if` field — a JavaScript regex expression built from the FORBIDDEN (plugin) or GATED (skill) command list. When the `if` expression is falsy, the hook script is not launched, avoiding unnecessary Python process spawns for safe commands like `git add`, `mkdir`, `echo`. Plugin template regex: union of all forbidden verbs (`cat`, `grep`, `git log`, etc.). Skill template regex: union of gated commands (`git push`, `gh release create`, etc.). Note in template: be permissive — false negatives (unnecessary launch) are safe; a too-tight regex silently skipping the gate is a security hole.
+
 ### Build artifact
 
-- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 5 SKILL.md changes. New sha256: `a63160da2e5a268755a1d097ff1b6dcdcff08f7d27a5b79a6c305167453fedaf`. The CI drift check is updated automatically since the committed zip is the source of truth.
+- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 6 SKILL.md changes. New sha256: `82a280021e83d91d288856a69f15f3039067a20ca898d4a5fa83ba1b53b52c7f`. The CI drift check is updated automatically since the committed zip is the source of truth.
 
 ## [1.0.1] — 2026-04-14
 
