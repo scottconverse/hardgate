@@ -54,16 +54,17 @@ try {
     $FakeHome = Join-Path $Work 'home'
     New-Item -ItemType Directory -Path $FakeHome -Force | Out-Null
 
-    # Override $HOME via a nested PowerShell process so the parent env is safe
+    # Pass -TargetHome to the installer so it writes into our isolated dir.
+    # (Overriding $HOME in a child pwsh -Command does not reliably propagate
+    # to the script's automatic $HOME — the parameter is the clean path.)
     $installScript = Join-Path $Extracted 'install.ps1'
     $log1 = Join-Path $Work 'install1.log'
 
-    # Run the installer with $HOME overridden
     $pwsh = if ($PSVersionTable.PSVersion.Major -ge 6) { 'pwsh' } else { 'powershell' }
     $launch = @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass',
-        '-Command',
-        "`$HOME = '$FakeHome'; & '$installScript'"
+        '-File', $installScript,
+        '-TargetHome', $FakeHome
     )
     $proc = Start-Process -FilePath $pwsh -ArgumentList $launch `
         -NoNewWindow -Wait -PassThru `
@@ -133,8 +134,8 @@ try {
     $log3 = Join-Path $Work 'install3.log'
     $bareLaunch = @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass',
-        '-Command',
-        "`$HOME = '$FakeHome'; & '$bareScript'"
+        '-File', $bareScript,
+        '-TargetHome', $FakeHome
     )
     $proc3 = Start-Process -FilePath $pwsh -ArgumentList $bareLaunch `
         -NoNewWindow -Wait -PassThru `
