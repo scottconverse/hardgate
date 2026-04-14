@@ -1,6 +1,6 @@
 
 Hardgate
-=
+========
 
 Make Claude Code actually follow the rules.
 
@@ -70,7 +70,6 @@ Install
 
 1. Copy the files
 
-
 Place these three files from this repo:
 
 | File | Destination |
@@ -91,12 +90,10 @@ Then create each file with the contents from this repo.
 
 2. Restart
 
-
 Restart the Code tab (or Claude Code CLI). The skill and commands load at session start.
 
 
 3. Verify
-
 
 Type /hard-gate in the Code tab. You should see a discovery list of your installed plugins, skills, and commands, followed by "Which one do you want to gate?"
 
@@ -108,7 +105,6 @@ Usage
 
 
 Install a gate
-
 
 
     /hard-gate
@@ -130,7 +126,6 @@ The installer will:
 
 
 After install: verify the gate
-
 
 The installer finishes by giving you a test prompt to copy. The flow is:
 
@@ -159,7 +154,6 @@ Example test prompt (for a context-mode gate):
 Remove a gate
 
 
-
     /disable-gate
 
 
@@ -180,7 +174,6 @@ How It Works — By Target Type
 
 Plugin gates (e.g., context-mode)
 
-
 What's blocked: Bash commands that should go through the plugin's MCP tools instead. For context-mode, this means cat, grep, git log, pytest, ls -la, and anything else that produces large output.
 
 What's allowed: Write operations (git add, git commit, git push, mkdir, rm, mv, cp, chmod) and navigation (cd, pwd, echo).
@@ -190,7 +183,6 @@ How it blocks: A Python tokenizer parses the Bash command into sub-commands, str
 
 Skill gates (e.g., coder-ui-qa-test / mandatory deliverables)
 
-
 What's blocked: git push, gh release create, npm publish, or python -m build when required deliverables are missing from the project directory.
 
 What's allowed: The same commands succeed once all required deliverables exist on disk.
@@ -199,7 +191,6 @@ How it blocks: The hook checks for the existence of required files (README, USER
 
 
 Shortcut gates
-
 
 What's blocked: Nothing — shortcuts can't be hard-gated because there's no tool call to intercept for "the user could have used a slash command but typed words instead."
 

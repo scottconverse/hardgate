@@ -5,6 +5,21 @@ All notable changes to hardgate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `scripts/build-installer.py` — reproducible builder for `dist/hardgate-v<VERSION>.zip`. Syncs canonical skill files from the repo root into `installer/`, then produces a deterministic zip (fixed mtime, sorted entries, Unix `create_system`, 0755 for `install.sh` / 0644 for the rest).
+- `scripts/build-docs.py` — regenerates `README.txt/.docx/.pdf` and `USER-MANUAL.docx/.pdf` from the `.md` sources, with the UML architecture diagram embedded in the `.docx` and `.pdf` appendices.
+- `scripts/test-installer.ps1` — PowerShell mirror of `test-installer.sh`, exercises `install.ps1` against an isolated fake `$HOME` with the same four test groups (zip integrity, happy path, backup-on-reinstall, refuse-on-missing-sources).
+- `.github/workflows/ci.yml` — GitHub Actions CI running three jobs on every push and PR:
+  1. `install.sh` test harness on `ubuntu-latest`
+  2. `install.ps1` test harness on `windows-latest`
+  3. installer drift check — rebuilds `hardgate-v1.0.0.zip` from source in a tmpdir and fails if the sha256 does not match the committed `dist/hardgate-v1.0.0.zip`.
+
+### Changed
+- `dist/hardgate-v1.0.0.zip` rebuilt via `scripts/build-installer.py` for reproducibility. The Release asset on GitHub was re-uploaded to match. The installed-file contents are byte-identical to the original; only the zip container metadata (file order, create_system, mtimes) changed. New sha256: `9f4f521d7db0d47d10d3a35503e8f3dd8bd1be05b09ee184f2238e82c2d497fc`.
+- README/USER-MANUAL multi-format outputs regenerated through `scripts/build-docs.py`. The ad-hoc initial build used a `©` glyph in the copyright line; the reproducible build uses ASCII `(c)` to avoid encoding surprises in PDFs.
+
 ## [1.0.0] — 2026-04-14
 
 ### Added

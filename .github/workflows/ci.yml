@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # -----------------------------------------------------------------------
+  test-install-sh:
+    name: install.sh (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run bash installer test harness
+        run: bash scripts/test-installer.sh
+
+  # -----------------------------------------------------------------------
+  test-install-ps1:
+    name: install.ps1 (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run PowerShell installer test harness
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test-installer.ps1
+
+  # -----------------------------------------------------------------------
+  installer-drift-check:
+    name: installer drift check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Rebuild installer zip in a tmpdir
+        id: rebuild
+        run: |
+          set -euo pipefail
+          TMP="$(mktemp -d)"
+          # Copy the repo to a tmpdir so the build doesn't touch dist/ in place
+          cp -r . "$TMP/hardgate"
+          cd "$TMP/hardgate"
+          python scripts/build-installer.py 1.0.0
+          BUILT_HASH="$(sha256sum dist/hardgate-v1.0.0.zip | awk '{print $1}')"
+          echo "built_hash=$BUILT_HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Hash the committed zip
+        id: committed
+        run: |
+          set -euo pipefail
+          COMMITTED_HASH="$(sha256sum dist/hardgate-v1.0.0.zip | awk '{print $1}')"
+          echo "committed_hash=$COMMITTED_HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Compare
+        run: |
+          set -euo pipefail
+          BUILT="${{ steps.rebuild.outputs.built_hash }}"
+          COMMITTED="${{ steps.committed.outputs.committed_hash }}"
+          echo "built:     $BUILT"
+          echo "committed: $COMMITTED"
+          if [ "$BUILT" != "$COMMITTED" ]; then
+            echo "::error::installer drift: dist/hardgate-v1.0.0.zip does not match a fresh build from source."
+            echo "::error::Rebuild with: python scripts/build-installer.py 1.0.0"
+            exit 1
+          fi
+          echo "OK — committed installer matches source."
