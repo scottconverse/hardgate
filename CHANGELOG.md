@@ -5,7 +5,7 @@ All notable changes to hardgate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] — 2026-04-14
 
 ### v1.1.0 Sprint 1 — quick wins (7 audit items)
 
@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Build artifact
 
-- `dist/hardgate-v1.0.1.zip` rebuilt after Sprint 6 SKILL.md changes. New sha256: `82a280021e83d91d288856a69f15f3039067a20ca898d4a5fa83ba1b53b52c7f`. The CI drift check is updated automatically since the committed zip is the source of truth.
+- `dist/hardgate-v1.1.0.zip` — sha256: `54d5e32f8ee167f5207a05732d79ff28daea5b6ee64b350cb7a14e1181f04d7f`. The CI drift check is updated automatically since the committed zip is the source of truth.
 
 ## [1.0.1] — 2026-04-14
 

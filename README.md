@@ -61,7 +61,7 @@ Download the latest release zip and run the installer for your platform:
 
 **macOS / Linux:**
 ```bash
-curl -L https://github.com/scottconverse/hardgate/releases/latest/download/hardgate-v1.0.1.zip -o hardgate.zip
+curl -L https://github.com/scottconverse/hardgate/releases/latest/download/hardgate-v1.1.0.zip -o hardgate.zip
 unzip hardgate.zip -d hardgate
 cd hardgate
 bash install.sh
@@ -69,7 +69,7 @@ bash install.sh
 
 **Windows (PowerShell):**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/scottconverse/hardgate/releases/latest/download/hardgate-v1.0.1.zip" -OutFile hardgate.zip
+Invoke-WebRequest -Uri "https://github.com/scottconverse/hardgate/releases/latest/download/hardgate-v1.1.0.zip" -OutFile hardgate.zip
 Expand-Archive hardgate.zip -DestinationPath hardgate
 pwsh -File hardgate\install.ps1
 ```
