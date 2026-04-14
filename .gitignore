@@ -1,0 +1,47 @@
+# hardgate .gitignore
+
+# Backups produced by the installer and gate tooling
+*.bak-*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.Python
+
+# Node (in case future tooling needs it)
+node_modules/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Credentials — never commit
+*.pem
+*.key
+secrets.json
+
+# Local build artifacts (the released zip lives in dist/)
+# dist/ is kept in the repo because hardgate-v1.0.0.zip is the installer
+# artifact. If that changes, uncomment the next line:
+# dist/
+
+# Test / coverage reports
+.coverage
+htmlcov/
+.pytest_cache/
