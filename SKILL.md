@@ -130,6 +130,26 @@ print(f"Next Hard Rule number: {rule_number}")
 
 If the file is empty or has no Hard Rules, start at 1. Use the printed number as `{{RULE_NUMBER}}` throughout all artifacts.
 
+**Custom deliverables? (X2 — for SKILL targets that gate `git push` only):** Ask the user:
+
+> "Does this project's deliverable structure match the standard hardgate pattern (UML diagram, README in 4 formats, USER-MANUAL in 3 formats, docs/index.html, Discussions seed)? If not, I'll write a `.claude/deliverables.json` tailored to your project structure."
+
+If the user says **no** (or describes a different structure):
+- Write `.claude/deliverables.json` using this schema:
+  ```json
+  {
+    "version": 1,
+    "required": [
+      { "name": "Description", "glob": "alt1|alt2|alt3", "optional": false }
+    ]
+  }
+  ```
+- `glob` is a `|`-delimited alternates string — split on `|`, each fed to `glob.glob(recursive=True)`, first file match wins.
+- `"optional": true` → WARN on stderr, does not block.
+- Malformed config fails closed — gate exits 2 and refuses to push until fixed or deleted.
+
+If the user says **yes**, skip this step — hardcoded checks apply when `.claude/deliverables.json` is absent.
+
 Confirm with the user in 2-3 sentences what you found. Example: "I'll block [X] and require [Y]. [Z] will still work normally. Correct?"
 
 Proceed on confirmation.
