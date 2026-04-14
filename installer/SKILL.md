@@ -116,6 +116,40 @@ Read the target's files (SKILL.md, README, manifest, command file). Extract:
 - RULE_NUMBER: Next available Hard Rule number.
 - RULE_NAME: Short name.
 
+**Deriving RULE_NUMBER:**
+
+Run this before writing any artifacts to get the next available Hard Rule number:
+
+```python
+import re, pathlib
+text = pathlib.Path('~/.claude/CLAUDE.md').expanduser().read_text(encoding='utf-8', errors='replace')
+nums = [int(n) for n in re.findall(r'Hard Rule (\d+)', text)]
+rule_number = max(nums) + 1 if nums else 1
+print(f"Next Hard Rule number: {rule_number}")
+```
+
+If the file is empty or has no Hard Rules, start at 1. Use the printed number as `{{RULE_NUMBER}}` throughout all artifacts.
+
+**Custom deliverables? (X2 — for SKILL targets that gate `git push` only):** Ask the user:
+
+> "Does this project's deliverable structure match the standard hardgate pattern (UML diagram, README in 4 formats, USER-MANUAL in 3 formats, docs/index.html, Discussions seed)? If not, I'll write a `.claude/deliverables.json` tailored to your project structure."
+
+If the user says **no** (or describes a different structure):
+- Write `.claude/deliverables.json` using this schema:
+  ```json
+  {
+    "version": 1,
+    "required": [
+      { "name": "Description", "glob": "alt1|alt2|alt3", "optional": false }
+    ]
+  }
+  ```
+- `glob` is a `|`-delimited alternates string — split on `|`, each fed to `glob.glob(recursive=True)`, first file match wins.
+- `"optional": true` → WARN on stderr, does not block.
+- Malformed config fails closed — gate exits 2 and refuses to push until fixed or deleted.
+
+If the user says **yes**, skip this step — hardcoded checks apply when `.claude/deliverables.json` is absent.
+
 Confirm with the user in 2-3 sentences what you found. Example: "I'll block [X] and require [Y]. [Z] will still work normally. Correct?"
 
 Proceed on confirmation.
@@ -134,6 +168,15 @@ cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak-$TIMESTAMP 2>/dev/null || true
 ```
 
 If a project CLAUDE.md exists, back that up too.
+
+After creating backups, prune old ones — keep the 3 most recent per base file:
+
+```bash
+for base in ".claude/settings.json" "$HOME/.claude/settings.json" "$HOME/.claude/CLAUDE.md" "./CLAUDE.md"; do
+  mapfile -t old < <(ls -t "${base}.bak-"* 2>/dev/null | tail -n +4)
+  [ ${#old[@]} -gt 0 ] && rm -f "${old[@]}"
+done
+```
 
 ---
 
@@ -235,7 +278,62 @@ def find_project_root(payload):
     except Exception:
         pass
     return os.environ.get("CLAUDE_PROJECT_DIR") or cwd or "."
+
+
+def check_override_marker(rule_num: int) -> None:
+    """Time-limited single-use override marker check (X4).
+
+    The model creates .claude/hardgate-override-rule-N with str(time.time())
+    as content when the human types 'override rule N'. Valid markers (<60s)
+    grant a one-time bypass. Stale or corrupt markers are deleted silently.
+    """
+    marker = (
+        pathlib.Path(os.environ.get("CLAUDE_PROJECT_DIR", "."))
+        / ".claude"
+        / f"hardgate-override-rule-{rule_num}"
+    )
+    if not marker.exists():
+        return
+    try:
+        age = time.time() - float(marker.read_text().strip())
+        marker.unlink()
+        if age < 60:
+            sys.stderr.write(
+                f"[HARD-RULE-{rule_num}] Override marker valid (age={age:.1f}s < 60s). "
+                f"One-time bypass granted.\n"
+            )
+            sys.exit(0)
+        sys.stderr.write(
+            f"[HARD-RULE-{rule_num}] Override marker EXPIRED (age={age:.1f}s >= 60s). "
+            f"Marker deleted. Type 'override rule {rule_num}' again to re-arm.\n"
+        )
+    except Exception:
+        try:
+            marker.unlink()
+        except Exception:
+            pass
 ```
+
+In `main()`, call `check_override_marker({{RULE_NUMBER}})` immediately after the Bash-only guard and before command parsing:
+
+```python
+    if payload.get("tool_name") != "Bash":
+        sys.exit(0)
+
+    check_override_marker({{RULE_NUMBER}})   # X4: time-limited override bypass
+
+    cmd = ...  # rest of your command extraction
+```
+
+Add `import pathlib, time` to the imports block.
+
+**Override UX protocol (X4):** When the human types "override rule {{RULE_NUMBER}}":
+1. Write `str(time.time())` to `.claude/hardgate-override-rule-{{RULE_NUMBER}}` in the project's `.claude/` directory.
+2. Immediately say: "Override armed. Marker expires in 60 seconds — issuing the gated command now."
+3. Execute the gated command as the **very next tool call** — no other tool calls in between.
+4. If any other tool call occurs before the gated command (analysis, file reads, etc.), re-warn the user and ask for a fresh "override rule {{RULE_NUMBER}}". The marker will likely have expired.
+
+Document this in the Hard Rule block (Artifact 4) so the model knows the protocol in future sessions.
 
 **For SHORTCUT targets**: exit 0 with a reminder on stderr (nag only, not blocking).
 
@@ -243,12 +341,14 @@ After writing both files: `chmod +x .claude/hooks/<target>-gate.sh`
 
 **Unit test immediately after writing** (assert exit code, do not just echo it):
 ```bash
-RESULT=$(python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"<FORBIDDEN_COMMAND>"}}' 2>&1)
-EXIT=$?
-[ "$EXIT" = "2" ] || { echo "GATE UNIT TEST FAILED (exit=$EXIT) — install cannot proceed"; echo "$RESULT"; exit 1; }
-echo "UNIT TEST PASSED: $RESULT"
+HG_TEST_OUTPUT=$(python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"<FORBIDDEN_COMMAND>"}}' 2>&1)
+HG_TEST_EXIT=$?
+[ "$HG_TEST_EXIT" = "2" ] || { echo "GATE UNIT TEST FAILED (exit=$HG_TEST_EXIT) — install cannot proceed"; echo "$HG_TEST_OUTPUT"; exit 1; }
+echo "UNIT TEST PASSED: $HG_TEST_OUTPUT"
 ```
 Must return EXIT: 2 with the HARD-RULE marker. If not, fix before proceeding.
+
+**Save for Step 7:** Note the exact content of `$HG_TEST_OUTPUT` and `$HG_TEST_EXIT`. Step 7 will write both verbatim to `.claude/hardgate-install-log.md` and display them in the completion report.
 
 ---
 
@@ -300,7 +400,8 @@ Read the current `.claude/settings.json` (PROJECT-LEVEL). Add the PreToolUse hoo
         "matcher": "Bash",
         "hooks": [{
           "type": "command",
-          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/<target>-gate.sh"
+          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/<target>-gate.sh",
+          "if": "<JS regex — see below>"
         }]
       }
     ]
@@ -309,6 +410,20 @@ Read the current `.claude/settings.json` (PROJECT-LEVEL). Add the PreToolUse hoo
 ```
 
 **(B7)** Quote the variable alone, not the whole path. Both forms are functionally equivalent in POSIX shells, but variable-only quoting matches Anthropic's documented hook examples and is the convention to follow.
+
+**(D1) `if` field — pre-filter hook launches:** The `if` value is a JavaScript expression evaluated against the tool payload. When it is falsy, the hook script is never launched — avoids a Python process spawn for every `git add`, `mkdir`, etc. Build the regex from the FORBIDDEN or GATED list:
+
+**For PLUGIN targets** (e.g., context-mode — blocks forbidden read verbs):
+```json
+"if": "tool_input.command && /\\bcat\\b|\\bhead\\b|\\btail\\b|\\bgrep\\b|\\brg\\b|\\bfind\\b|git\\s+(log|diff|show|blame)|\\bpytest\\b|\\bjest\\b|npm\\s+test|docker.*(logs|compose)|\\bjournalctl\\b|\\bdmesg\\b|\\bls\\b.*-[la]/.test(tool_input.command)"
+```
+
+**For SKILL targets** (e.g., coder-ui-qa-test — blocks push/release until deliverables exist):
+```json
+"if": "tool_input.command && /git\\s+push|gh\\s+release\\s+create|npm\\s+publish|python3?\\s+-m\\s+build/.test(tool_input.command)"
+```
+
+The regex should be a union of every verb pattern the Python gate checks. When in doubt, be permissive — a false negative (gate runs unnecessarily) is safe; a false positive (gate silently skipped for a forbidden command) is a security hole.
 
 For SKILL targets, also add a Stop hook (same B7 quoting style):
 ```json
@@ -386,12 +501,25 @@ Make executable. Add to `.claude/settings.json` (PROJECT-LEVEL) under `SessionSt
 
 #### ARTIFACT 7: Memory file
 
-Find the current project's memory directory:
-```bash
-ls -d ~/.claude/projects/*/memory/ 2>/dev/null | head -5
+Derive the memory directory path deterministically from `$CLAUDE_PROJECT_DIR`. Claude Code encodes the project path by replacing each `:`, `/`, and `\` with a single `-`.
+
+```python
+import os, re, pathlib
+project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '')
+encoded = re.sub(r'[:/\\]', '-', project_dir)
+memory_dir = pathlib.Path.home() / '.claude' / 'projects' / encoded / 'memory'
+memory_dir.mkdir(parents=True, exist_ok=True)
+print(memory_dir)
 ```
 
-Create `~/.claude/projects/<project>/memory/<target>-gate.md` with a summary of the gate.
+Or in Bash (if Python is unavailable):
+```bash
+encoded=$(python3 -c "import os,re; p=os.environ.get('CLAUDE_PROJECT_DIR',''); print(re.sub(r'[:/\\\\]','-',p))")
+memory_dir="$HOME/.claude/projects/${encoded}/memory"
+mkdir -p "$memory_dir"
+```
+
+Create `${memory_dir}/{{TARGET}}-gate.md` with a summary of the gate.
 
 ---
 
@@ -401,17 +529,36 @@ Run a single verification pass:
 
 ```bash
 echo "=== ARTIFACT CHECK ==="
-echo "1.  Hook script:      " && ls -la .claude/hooks/{{TARGET}}-gate.sh .claude/hooks/{{TARGET}}-gate.py
+
+# Derive memory dir deterministically (B4)
+ENCODED=$(python3 -c "import os,re; p=os.environ.get('CLAUDE_PROJECT_DIR',''); print(re.sub(r'[:/\\\\]','-',p))")
+MEMORY_DIR="$HOME/.claude/projects/${ENCODED}/memory"
+
+echo "1.  Hook script:      " && ls -la .claude/hooks/{{TARGET}}-gate.sh .claude/hooks/{{TARGET}}-gate.py || { echo "ARTIFACT 1 MISSING — gate .sh and .py not found"; exit 1; }
+
 # B1: stop-check is required for SKILL targets only — skip for plugin/shortcut.
 if [ "{{TARGET_TYPE}}" = "skill" ]; then
-  echo "1.5 Stop-check:       " && ls -la .claude/hooks/{{TARGET}}-stop-check.sh .claude/hooks/{{TARGET}}-stop-check.py || { echo "MISSING — Stop hook will silently fail"; exit 1; }
+  echo "1.5 Stop-check:       " && ls -la .claude/hooks/{{TARGET}}-stop-check.sh .claude/hooks/{{TARGET}}-stop-check.py || { echo "ARTIFACT 1.5 MISSING — stop-check scripts not found"; exit 1; }
 fi
-echo "2.  Project settings: " && python3 -c "import json; d=json.load(open('.claude/settings.json')); print('hooks:', list(d.get('hooks',{}).keys()))"
-echo "3. User permissions: " && python3 -c "import json; d=json.load(open('$HOME/.claude/settings.json')); print('permissions:', len(d.get('permissions',{}).get('allow',[])),'allow entries')"
-echo "4. Global CLAUDE.md: " && grep -c "Hard Rule {{RULE_NUMBER}}" ~/.claude/CLAUDE.md
-echo "5. Project CLAUDE.md:" && grep -c "Hard Rule {{RULE_NUMBER}}" ./CLAUDE.md 2>/dev/null || echo "(no project CLAUDE.md)"
-echo "6. SessionStart:     " && ls -la .claude/hooks/{{TARGET}}-session-start.sh
-echo "7. Memory file:      " && ls ~/.claude/projects/*/memory/{{TARGET}}-gate.md 2>/dev/null || echo "(memory file location TBD)"
+
+echo "2.  Project settings: " && python3 -c "import json; d=json.load(open('.claude/settings.json')); print('hooks:', list(d.get('hooks',{}).keys()))" || { echo "ARTIFACT 2 MISSING — .claude/settings.json not found or malformed"; exit 1; }
+
+echo "3.  User permissions: " && python3 -c "import json,pathlib; d=json.loads(pathlib.Path.home().joinpath('.claude/settings.json').read_text()); print('permissions:', len(d.get('permissions',{}).get('allow',[])),'allow entries')" || { echo "ARTIFACT 3 MISSING — ~/.claude/settings.json not found or malformed"; exit 1; }
+
+# D5: derive count and assert exactly 1 occurrence (missing = 0, collision = >1)
+count4=$(grep -c "Hard Rule {{RULE_NUMBER}}" ~/.claude/CLAUDE.md 2>/dev/null || echo 0)
+[ "$count4" -ge 1 ] || { echo "ARTIFACT 4 MISSING — Hard Rule {{RULE_NUMBER}} not found in ~/.claude/CLAUDE.md"; exit 1; }
+[ "$count4" -eq 1 ] || { echo "ARTIFACT 4 COLLISION: found ${count4} occurrences of 'Hard Rule {{RULE_NUMBER}}' in ~/.claude/CLAUDE.md — expected exactly 1"; exit 1; }
+echo "4.  Global CLAUDE.md: Hard Rule {{RULE_NUMBER}} present (${count4} occurrence)"
+
+# Artifact 5 is intentionally soft: user may not be in a project directory
+echo "5.  Project CLAUDE.md:" && grep -c "Hard Rule {{RULE_NUMBER}}" ./CLAUDE.md 2>/dev/null || echo "(no project CLAUDE.md — OK if not in a project dir)"
+
+echo "6.  SessionStart:     " && ls -la .claude/hooks/{{TARGET}}-session-start.sh .claude/hooks/{{TARGET}}-session-start.py || { echo "ARTIFACT 6 MISSING — session-start scripts not found"; exit 1; }
+
+echo "7.  Memory file:      " && ls "${MEMORY_DIR}/{{TARGET}}-gate.md" || { echo "ARTIFACT 7 MISSING — ${MEMORY_DIR}/{{TARGET}}-gate.md not found"; exit 1; }
+
+echo "=== ALL ARTIFACTS VERIFIED ==="
 ```
 
 If ANY artifact is missing, fix it before proceeding. Do not skip.
@@ -498,6 +645,43 @@ Behavioral tests:
 ACTIVATION: Restart Claude Code / Cowork to load the new hooks.
 To remove this gate later: /disable-gate {{TARGET}}
 ```
+
+Also append this report to `.claude/hardgate-install-log.md` (create if it doesn't exist):
+
+```python
+import datetime, pathlib
+
+log_path = pathlib.Path('.claude/hardgate-install-log.md')
+timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+# HG_TEST_EXIT and HG_TEST_OUTPUT captured from Artifact 1 unit test
+entry = f"""
+## [{timestamp}] HARD GATE INSTALLED: {{TARGET_NAME}}
+
+**Rule:** Hard Rule {{RULE_NUMBER}} — {{RULE_NAME}}
+**Type:** [plugin/skill/shortcut]
+
+### Artifacts written
+1. .claude/hooks/{{TARGET}}-gate.sh + .py
+2. .claude/settings.json (PreToolUse hook added)
+3. ~/.claude/settings.json (permissions updated)
+4. ~/.claude/CLAUDE.md (Hard Rule {{RULE_NUMBER}})
+5. <project>/CLAUDE.md (Hard Rule {{RULE_NUMBER}})
+6. .claude/hooks/{{TARGET}}-session-start.sh + .py
+7. ~/.claude/projects/.../memory/{{TARGET}}-gate.md
+
+### Unit test result (D4)
+Exit code: {HG_TEST_EXIT}
+Output:
+{HG_TEST_OUTPUT}
+"""
+
+with log_path.open('a', encoding='utf-8') as f:
+    f.write(entry)
+print(f"Install log updated: {log_path}")
+```
+
+Replace `{HG_TEST_EXIT}` and `{HG_TEST_OUTPUT}` with the actual values captured in Artifact 1. Display the unit test output verbatim in the completion report shown to the user.
 
 ---
 
