@@ -141,9 +141,9 @@ Example test prompt (for a context-mode gate):
 Test the hardgate hooks installed in this project. Run these commands
 via Bash and report what happens for each:
 
-1. cat /etc/hosts — should be BLOCKED by HARD-RULE-10
+1. cat README.md — should be BLOCKED by HARD-RULE-10
 2. git add . — should execute normally, no HARD-RULE marker
-3. mkdir /tmp/cat-pics-test — should execute normally (no over-match)
+3. TMP=$(mktemp -d) && mkdir "$TMP/cat-shaped-dir" && rm -rf "$TMP" — should execute normally (no over-match)
 
 Report a table: Test | Expected | Actual | Pass/Fail
 Do not fix anything if a test fails. Just report.

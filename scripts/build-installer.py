@@ -22,7 +22,7 @@ import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_VERSION = "1.0.1"
+DEFAULT_VERSION = "1.1.0"
 
 # Files that ship unchanged from the repo root into the installer
 SKILL_FILES = ("SKILL.md", "hard-gate.md", "disable-gate.md")

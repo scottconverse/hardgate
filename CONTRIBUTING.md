@@ -23,7 +23,7 @@ hardgate/
 │   ├── install.ps1           # PowerShell installer (Windows)
 │   └── INSTALLER-README.md
 ├── dist/
-│   └── hardgate-v1.0.1.zip   # Built offline installer (attached to Releases)
+│   └── hardgate-v1.1.0.zip   # Built offline installer (attached to Releases)
 └── .github/
     └── DISCUSSIONS_SEEDED    # Marker + drafts for seed discussion posts
 ```
@@ -47,11 +47,11 @@ python3 scripts/build-docs.py
 To rebuild the offline installer zip reproducibly from `installer/` (syncs the canonical `SKILL.md`, `hard-gate.md`, `disable-gate.md` from the repo root first):
 
 ```bash
-python3 scripts/build-installer.py            # builds v1.0.1 to dist/
-python3 scripts/build-installer.py 1.1.0      # builds v1.1.0 to dist/
+python3 scripts/build-installer.py            # builds v1.1.0 to dist/ (default)
+python3 scripts/build-installer.py 1.1.0      # explicit — same result
 ```
 
-The build is deterministic — identical inputs produce a byte-identical zip. CI enforces this via a drift check (`.github/workflows/ci.yml`) that rebuilds from source in a tmpdir and compares sha256 against the committed `dist/hardgate-v1.0.1.zip`.
+The build is deterministic — identical inputs produce a byte-identical zip. CI enforces this via a drift check (`.github/workflows/ci.yml`) that rebuilds from source in a tmpdir and compares sha256 against the committed `dist/hardgate-v1.1.0.zip`.
 
 ## Testing your changes
 
@@ -74,7 +74,7 @@ pwsh -File scripts/test-installer.ps1    # or powershell -ExecutionPolicy Bypass
 For tokenizer changes (the Python gate script inside `SKILL.md` — Artifact 1), you can unit-test directly:
 
 ```bash
-python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"cat /etc/hosts"}}' ; echo $?
+python3 .claude/hooks/<target>-gate.py <<< '{"tool_name":"Bash","tool_input":{"command":"cat README.md"}}' ; echo $?
 ```
 
 Expected: `2` for forbidden commands, `0` silently for allowed ones.
