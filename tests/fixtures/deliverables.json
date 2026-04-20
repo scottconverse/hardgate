@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "required": [
+    { "name": "README.md",      "glob": "README.md",                     "optional": false },
+    { "name": "CHANGELOG.md",   "glob": "CHANGELOG.md",                  "optional": false },
+    { "name": "LICENSE",        "glob": "LICENSE|LICENSE.md|LICENSE.txt", "optional": false },
+    { "name": "docs/index.html","glob": "docs/index.html",               "optional": false }
+  ]
+}
