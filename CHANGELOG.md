@@ -5,6 +5,12 @@ All notable changes to hardgate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `templates/commit-size-gate/` — canonical reusable template for Rule 11 (Commit-Size Acknowledgment Gate). Byte-identical to the validated production deployment in `civiccore`, `scottconverse/patentforgelocal` (commit `007e924`), and `scottconverse/productteam` (commit `76333aa`). `THRESHOLD=800` insertions+deletions (non-binary), literal-bracketed-token matching (`[MVP]` / `[LARGE-CHANGE]` / `[REFACTOR]` / `[INITIAL]` / `[MERGE]` / `[REVERT]` / `[SCOPE-EXPANSION: <reason>]`), fail-open on `--amend` / `-F` / editor commits, 60-second `override rule 11` one-shot pressure valve. Template README at `templates/commit-size-gate/README.md` covers install steps and verification recipe; `tests/commit_size_gate_template_test.py` provides a pytest smoke test against the real template file.
+
 ## [1.1.0] — 2026-04-14
 
 ### v1.1.0 Sprint 1 — quick wins (7 audit items)
