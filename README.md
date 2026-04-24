@@ -46,6 +46,16 @@ Level 3 is the one that matters. The model cannot bypass a hook that returns `ex
 
 ---
 
+## Canonical templates
+
+For commonly-used gates, hardgate ships reference implementations under `templates/` that can be copied directly into a project's `.claude/hooks/` — skipping the full `/hard-gate` installer flow when you just want a known-good gate.
+
+- **[`templates/commit-size-gate/`](templates/commit-size-gate/)** — reference implementation for Rule 11 (Commit-Size Acknowledgment Gate). Blocks `git commit` when the staged diff exceeds `THRESHOLD` (default 800 lines) and the message lacks one of the allowed bracketed tag tokens; 60-second `override rule 11` one-shot pressure valve. See [`templates/commit-size-gate/README.md`](templates/commit-size-gate/README.md) for install steps, settings.json wiring, and the verification recipe.
+
+Each template is byte-identical to a validated production deployment and covered by its own pytest smoke test under `tests/`.
+
+---
+
 ## Requirements
 
 - **Claude Desktop** with Cowork enabled (Windows or Mac), or **Claude Code CLI**
