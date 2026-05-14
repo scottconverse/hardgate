@@ -11,7 +11,7 @@ jobs:
   # -----------------------------------------------------------------------
   test-install-sh:
     name: install.sh (Linux)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -34,7 +34,7 @@ jobs:
   # -----------------------------------------------------------------------
   installer-drift-check:
     name: installer drift check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -80,7 +80,7 @@ jobs:
   # -----------------------------------------------------------------------
   pytest:
     name: "pytest / Python ${{ matrix.python-version }}"
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     strategy:
       fail-fast: false
       matrix:
